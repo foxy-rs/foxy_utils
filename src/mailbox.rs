@@ -1,4 +1,4 @@
-use crossbeam::channel::{Receiver, RecvError, SendError, Sender, TryRecvError};
+use crossbeam::channel::{Receiver, RecvError, SendError, Sender, TryRecvError, TrySendError};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -24,6 +24,10 @@ impl<SenderMessage: Send + Sync, ReceiverMessage: Send + Sync> Mailbox<SenderMes
     Self { sender, receiver }
   }
 
+  pub fn try_send(&self, message: SenderMessage) -> Result<(), MessagingError<SenderMessage>> {
+    self.sender.try_send(message).map_err(MessagingError::from)
+  }
+
   pub fn send(&self, message: SenderMessage) -> Result<(), MessagingError<SenderMessage>> {
     self.sender.send(message).map_err(MessagingError::from)
   }
@@ -44,7 +48,12 @@ impl<SenderMessage: Send + Sync, ReceiverMessage: Send + Sync> Mailbox<SenderMes
 
 #[derive(Error, Debug)]
 pub enum MessagingError<SenderMessage> {
-  #[error("failed to send message")]
+  #[error("{error}")]
+  TrySendError {
+    #[from]
+    error: TrySendError<SenderMessage>,
+  },
+  #[error("{error}")]
   SendError {
     #[from]
     error: SendError<SenderMessage>,
